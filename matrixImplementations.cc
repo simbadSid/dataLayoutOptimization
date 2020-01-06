@@ -3,6 +3,7 @@
 /**
  * \brief This module gathers a subset of the matrix implementations used by the HARDSI compiler.
  * \detail In this context, a data-structure implementation is a set of routines used to define, allocate access and free a data structure
+ * \author Riyane Sid Lakhdar
  */
 
 
