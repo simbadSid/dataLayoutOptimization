@@ -18,7 +18,7 @@
 	#define MATRIX_LINE_MAJ_GET(m, x, y)							m[y][x]
 	#define MATRIX_LINE_MAJ_SET(m, x, y, val)						m[y][x]	= val
 	#define MATRIX_LINE_MAJ_ADD(m, x, y, val)						m[y][x]	+= val
-	#define MATRIX_LINE_MAJ_FREE(m, X, Y, type)						FREE_2D_ARRAY(m, X, Y, type)
+	#define MATRIX_LINE_MAJ_FREE(m, X, Y, type)						FREE_2D_ARRAY(m, Y, X, type)
 
 	#define MATRIX_COLUMN_MAJ_DEFINE(type, name)					type **name
 	#define MATRIX_COLUMN_MAJ_ALLOCATE(type, X, Y, name, initVal)	ALLOCATE_2D_ARRAY(type, X, Y, name, initVal);
@@ -37,6 +37,168 @@
 	#define MATRIX_DIAG_MAJ_FREE(m, X, Y, type)						FREE_2D_ARRAY(m, 1+X+Y, 1+X+Y, type)
 
 
+/*===========================================
+ * \brief Matrix (stencil) definition and accessors depending on the data layout
+ ===========================================*/
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)							MATRIX_LINE_MAJ_DEFINE(type, name)
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)			MATRIX_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y)								MATRIX_LINE_MAJ_GET(m, x, y)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, val)							MATRIX_LINE_MAJ_SET(m, x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, val)							MATRIX_LINE_MAJ_ADD(m, x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, type)							MATRIX_LINE_MAJ_FREE(m, X, Y, type)
+	#define MATRIX_STENCIL_LINE_MAJ_MAP_REDUCE_SUM_3(m, x, y)					{													\
+																					float tmp	= MATRIX_LINE_MAJ_GET(m, x-1,y)		\
+																								+ MATRIX_LINE_MAJ_GET(m, x,	y)		\
+																								+ MATRIX_LINE_MAJ_GET(m, x+1,y)		\
+																								+ MATRIX_LINE_MAJ_GET(m, x,	y-1)	\
+																								+ MATRIX_LINE_MAJ_GET(m, x,	y+1);	\
+																					MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, tmp);		\
+																				}
+
+
+/*
+#include <pmmintrin.h>
+	template<class T>
+	struct MATRIX_STENCIL
+	{
+		T		**matrixLine;
+		T		**matrixColumn;
+	};
+
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)							struct MATRIX_STENCIL<type> *name
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)			name = (MATRIX_STENCIL<type>*)SAFE_MALLOC(sizeof(MATRIX_STENCIL<type>));	\
+																				MATRIX_LINE_MAJ_ALLOCATE(type, X, Y, (name->matrixLine), initVal);			\
+																				MATRIX_COLUMN_MAJ_ALLOCATE(type, X, Y, (name->matrixColumn), initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y)								MATRIX_LINE_MAJ_GET((m->matrixLine), x, y)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, val)							MATRIX_LINE_MAJ_SET((m->matrixLine), x, y, val);							\
+																				MATRIX_COLUMN_MAJ_SET((m->matrixColumn), x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, val)							MATRIX_LINE_MAJ_ADD((m->matrixLine), x, y, val);							\
+																				MATRIX_COLUMN_MAJ_ADD((m->matrixColumn), x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, type)							MATRIX_LINE_MAJ_FREE((m->matrixLine), X, Y, type);							\
+																				MATRIX_COLUMN_MAJ_FREE((m->matrixColumn), X, Y, type);						\
+																				free(m);
+	#define MATRIX_STENCIL_LINE_MAJ_MAP_REDUCE_SUM_3(m, x, y)					{																			\
+																					__m128	vectLine, vectColumn, vectTmp;									\
+																					float *ptrMatrixLine 	= (float*)(m->matrixLine	[y] + x);			\
+																					float *ptrMatrixColumn	= (float*)(m->matrixColumn	[x] + y);			\
+																																							\
+																					vectLine		= _mm_loadu_ps(ptrMatrixLine);							\
+																					vectColumn		= _mm_loadu_ps(ptrMatrixColumn);						\
+																					vectTmp			= _mm_add_ps(vectLine, vectColumn);						\
+																																							\
+																					vectTmp			= _mm_hadd_ps(vectTmp,	vectTmp);						\
+																					vectTmp			= _mm_hadd_ps(vectTmp,	vectTmp);						\
+																																							\
+																					vectLine[1]		= vectTmp[3] - vectLine[1] - vectLine[3] - vectColumn[3];\
+																					vectColumn[1]	= vectLine[1];											\
+																																							\
+																					_mm_storeu_ps(ptrMatrixLine,	vectLine);								\
+																					_mm_storeu_ps(ptrMatrixColumn,	vectColumn);							\
+																				}
+*/
+/*#
+	template<class T>
+	struct MATRIX_STENCIL
+	{
+		T **matrixLine;
+		T **matrixColumn;
+	};
+
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)					struct MATRIX_STENCIL<type> *name
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)	name = (MATRIX_STENCIL<type>*)SAFE_MALLOC(sizeof(MATRIX_STENCIL<type>));	\
+																		MATRIX_LINE_MAJ_ALLOCATE(type, X, Y, (name->matrixLine), initVal)			;\
+																		MATRIX_COLUMN_MAJ_ALLOCATE(type, X, Y, (name->matrixColumn), initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y)						MATRIX_LINE_MAJ_GET((m->matrixLine), x, y)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, val)					MATRIX_LINE_MAJ_SET((m->matrixLine), x, y, val)								;\
+																		MATRIX_COLUMN_MAJ_SET((m->matrixColumn), x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, val)					MATRIX_LINE_MAJ_ADD((m->matrixLine), x, y, val)								;\
+																		MATRIX_COLUMN_MAJ_ADD((m->matrixColumn), x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, type)					MATRIX_LINE_MAJ_FREE((m->matrixLine), X, Y, type)							;\
+																		MATRIX_COLUMN_MAJ_FREE((m->matrixColumn), X, Y, type)						;\
+																		free(m);
+	#define MATRIX_STENCIL_LINE_MAJ_MAP(m, x, y, xl, xc, xr, yt, yb)	xl = MATRIX_LINE_MAJ_GET(m->matrixLine,		x-1,	y)						;\
+																		xc = MATRIX_LINE_MAJ_GET(m->matrixLine,		x,		y)						;\
+																		xr = MATRIX_LINE_MAJ_GET(m->matrixLine,		x+1,	y)						;\
+																		yt = MATRIX_COLUMN_MAJ_GET(m->matrixColumn,	x,		y-1)					;\
+																		yb = MATRIX_COLUMN_MAJ_GET(m->matrixColumn,	x,		y+1)
+
+*/
+
+/*
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)													MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_DEFINE(type, name)
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, X_block, Y_block, name, initVal)				MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_ALLOCATE(type, X, Y, X_block, Y_block, name, initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y, X_block, Y_block)										MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_GET(m, x, y, X_block, Y_block)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, X_block, Y_block, val)									MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_SET(m, x, y, X_block, Y_block, val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, X_block, Y_block, val)									MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_ADD(m, x, y, X_block, Y_block, val)
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, X_block, Y_block, type)								MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_FREE(m, X, Y, X_block, Y_block, type)
+	#define MATRIX_STENCIL_LINE_MAJ_MAP(m, x, y,X_block, Y_block, xl, xc, xr, yt, yb)					xl = MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_GET(m, x-1,	y,	X_block, Y_block)	;\
+																										xc = MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_GET(m, x,	y,	X_block, Y_block)	;\
+																										xr = MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_GET(m, x+1,	y,	X_block, Y_block)	;\
+																										yt = MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_GET(m, x,	y-1,X_block, Y_block)	;\
+																										yb = MATRIX_LINE_MAJ_LARGE_BLOCK_COLUMN_GET(m, x,	y+1,X_block, Y_block)
+*/
+/*
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)													MATRIX_LINE_MAJ_DEFINE(type, name)
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, X_block, Y_block, name, initVal)				MATRIX_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y, X_block, Y_block)										MATRIX_LINE_MAJ_GET(m, x, y)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, X_block, Y_block, val)									MATRIX_LINE_MAJ_SET(m, x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, X_block, Y_block, val)									MATRIX_LINE_MAJ_ADD(m, x, y, val)
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, X_block, Y_block, type)								MATRIX_LINE_MAJ_FREE(m, X, Y, type)
+	#define MATRIX_STENCIL_LINE_MAJ_MAP(m, x, y,X_block, Y_block, xl, xc, xr, yt, yb)					MATRIX_LINE_MAJ_MAP(m, x, y,xl, xc, xr, yt, yb)
+*/
+
+/*
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)							MATRIX_LINE_MAJ_DEFINE(type, name)
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)			MATRIX_LINE_MAJ_ALLOCATE(type, 3*X, Y, name, initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y)								MATRIX_LINE_MAJ_GET(m, 3*x, y)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, val)							MATRIX_LINE_MAJ_SET(m, 3*x,		y,		val);								\
+																				MATRIX_LINE_MAJ_SET(m, 3*x+2,	y-1,	val);								\
+																				MATRIX_LINE_MAJ_SET(m, 3*x+1,	y+1,	val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, val)							{																			\
+																					float tmp = val + MATRIX_STENCIL_COLUMN_MAJ_GET(m, x, y);				\
+																					MATRIX_LINE_MAJ_ADD(m, 3*x,		y,		tmp);							\
+																					MATRIX_LINE_MAJ_ADD(m, 3*x+2,	y-1,	tmp);							\
+																					MATRIX_LINE_MAJ_ADD(m, 3*x+1,	y+1,	tmp);							\
+																				}
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, type)							MATRIX_COLUMN_MAJ_FREE(m,3*X, Y, type)
+	#define MATRIX_STENCIL_LINE_MAJ_MAP_REDUCE_SUM_3(m, x, y)					{																			\
+																					float tmp	= MATRIX_LINE_MAJ_GET(m, (3*(x-1)), y)						\
+																								+ MATRIX_LINE_MAJ_GET(m, (3*x),		y)						\
+																								+ MATRIX_LINE_MAJ_GET(m, (3*x + 1), y)						\
+																								+ MATRIX_LINE_MAJ_GET(m, (3*x + 2), y)						\
+																								+ MATRIX_LINE_MAJ_GET(m, (3*x + 3), y);						\
+																					MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, tmp);								\
+																				}
+*/
+
+
+/*
+#define XXXL	6
+#define XXXC	10
+
+
+	#define MATRIX_STENCIL_LINE_MAJ_DEFINE(type, name)							MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_DEFINE(type, name)
+	#define MATRIX_STENCIL_LINE_MAJ_ALLOCATE(type, X, Y, name, initVal)			MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_ALLOCATE(type, 3*X, Y, XXXL, XXXC, name, initVal)
+	#define MATRIX_STENCIL_LINE_MAJ_GET(m, x, y)								MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, 3*x, y, XXXL, XXXC)
+	#define MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, val)							MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_SET(m, 3*x, y, XXXL, XXXC,		val);			\
+																				MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_SET(m, 3*x+2,	y-1, XXXL, XXXC,	val);			\
+																				MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_SET(m, 3*x+1,	y+1, XXXL, XXXC,	val)
+	#define MATRIX_STENCIL_LINE_MAJ_ADD(m, x, y, val)							{																			\
+																					float tmp = val + MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, 3*x, y);			\
+																					MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_ADD(m, 3*x,		y, XXXL, XXXC,		tmp);		\
+																					MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_ADD(m, 3*x+2,	y-1, XXXL, XXXC,	tmp);			\
+																					MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_ADD(m, 3*x+1,	y+1, XXXL, XXXC,	tmp);			\
+																				}
+	#define MATRIX_STENCIL_LINE_MAJ_FREE(m, X, Y, type)							MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_FREE(m,3*X, Y, XXXL, XXXC, type)
+	#define MATRIX_STENCIL_LINE_MAJ_MAP_REDUCE_SUM_3(m, x, y)					{																			\
+																					float tmp	= MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, (3*(x-1)), y, XXXL, XXXC)	\
+																								+ MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, (3*x),		y, XXXL, XXXC)	\
+																								+ MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, (3*x + 1), y, XXXL, XXXC)	\
+																								+ MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, (3*x + 2), y, XXXL, XXXC)	\
+																								+ MATRIX_LINE_MAJ_LARGE_BLOCK_LINE_GET(m, (3*x + 3), y, XXXL, XXXC);	\
+																					MATRIX_STENCIL_LINE_MAJ_SET(m, x, y, tmp);								\
+																				}
+*/
 
 
 /*===========================================

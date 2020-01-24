@@ -15,7 +15,7 @@
 
 
 /**
- * \brief This files gives an implementation of the unit test worker (C++ class Worker) for the HARDSI version of the cross stencil.
+ * \brief This files gives an implementation of the unit test worker (C++ class Worker) for the HARDSI version of the adi.
  * \detail This code is based on an original implementation of the JPEG compression: https://github.com/MatthiasJReisinger/PolyBenchC-4.2.1.
  */
 
@@ -25,10 +25,12 @@
 // Local parameters (static)
 // --------------------------------------
 unsigned int N;
-MATRIX_DEFINE(DATA_TYPE, A_l);
-MATRIX_DEFINE(DATA_TYPE, A_c);
-MATRIX_DEFINE(DATA_TYPE, res);
+MATRIX_DEFINE(DATA_TYPE, matrix);
 
+
+
+
+#define STENCIL_FUNCTION(a0, a1, a2, a3, a4)	((a0*a1*a2) + (a3*a4))
 
 
 // --------------------------------------
@@ -48,40 +50,30 @@ void Worker::preProcess(char *fileInput_name, char *fileOutput_name)
 		LOGGER_error(1, "Can't open the input-data file \"%s\"", fileInput_name);
 	}
 
-	MATRIX_ALLOCATE(DATA_TYPE, N, N, A_l,	initialValue);
-	MATRIX_ALLOCATE(DATA_TYPE, N, N, A_c,	initialValue);
-	MATRIX_ALLOCATE(DATA_TYPE, N, N, res,	0);
+	MATRIX_ALLOCATE(DATA_TYPE, N, N, matrix,	initialValue);
 }
 
 
 /**
- * \brief Matrix correlation
+ * \brief Matrix adi
  */
 void Worker::compute ()
 {
-	unsigned int i, j, k;
+	unsigned int i, j;
 
-	for (i = 0; i < N; i++)
+	for (j = 1; j < N-1; j++)
 	{
-		for (j = 0; j < N; j++)
+		for (i = 1; i < N-1; i++)
 		{
-			DATA_TYPE val = MATRIX_GET(A_l, 0, 0);
-			for (k = 1; k < N; k++)
-			{
-				DATA_TYPE val_l = MATRIX_GET(A_l, k, j);
-				DATA_TYPE val_c = MATRIX_GET(A_c, i, k);
-				val += val_l + val_c;
-			}
-			MATRIX_SET(res, i, j, val);
+			MATRIX_MAP_REDUCE_SUM_3(matrix, i, j);
 		}
 	}
 }
 
+
 void Worker::postProcess()
 {
-	MATRIX_FREE(A_l, N, N, DATA_TYPE);
-	MATRIX_FREE(A_c, N, N, DATA_TYPE);
-	MATRIX_FREE(res, N, N, DATA_TYPE);
+	MATRIX_FREE(matrix, N, N, DATA_TYPE);
 }
 
 #ifdef MATRIX_OPTIMIZATION_STEP
